@@ -69,9 +69,8 @@ class Binlog2sql(object):
         flag_last_event = False
         e_start_pos, last_pos = stream.log_pos, stream.log_pos
         # to simplify code, we do not use flock for tmp_file.
-        tmp_file = create_unique_file('%s.%s' % (self.conn_setting['host'], self.conn_setting['port']))
-
-        with temp_open(tmp_file, "w") as f_tmp, self.connection as cursor:
+        final_result=[]
+        with self.connection as cursor:
             for binlog_event in stream:
                 if not self.stop_never:
                     try:
@@ -107,7 +106,7 @@ class Binlog2sql(object):
                         sql = concat_sql_from_binlog_event(cursor=cursor, binlog_event=binlog_event, no_pk=self.no_pk,
                                                            row=row, flashback=self.flashback, e_start_pos=e_start_pos)
                         if self.flashback:
-                            f_tmp.write(sql + '\n')
+                            final_result.append(sql)
                         else:
                             print(sql)
 
@@ -117,10 +116,26 @@ class Binlog2sql(object):
                     break
 
             stream.close()
-            f_tmp.close()
             if self.flashback:
-                self.print_rollback_sql(filename=tmp_file)
+                # 调用list缓存版本
+                # 原来方案reversed_lines：也还是一次性写入文件后全部读取，不太靠谱，所以直接使用内存list
+                self.print_rollback_sql_list(final_result=final_result)
         return True
+
+    # ROLLBACK需要倒序逆向执行
+    def print_rollback_sql_list(self, final_result):
+        final_result.reverse()
+        batch_size = 1000
+        i = 0
+        for line in final_result:
+            print(line.rstrip())
+            if i >= batch_size:
+                i = 0
+                if self.back_interval:
+                    print('SELECT SLEEP(%s);' % self.back_interval)
+            else:
+                i += 1
+
 
     # ROLLBACK需要倒序逆向执行
     def print_rollback_sql(self, filename):
@@ -128,6 +143,8 @@ class Binlog2sql(object):
         with open(filename, "rb") as f_tmp:
             batch_size = 1000
             i = 0
+            # 应该是reversed_lines解析出错了，导致字符串报异常UnicodeDecodeError
+            # 全文直接打印出来没错：print(line.decode("utf-8",'strict').rstrip())
             for line in reversed_lines(f_tmp):
                 print(line.rstrip())
                 if i >= batch_size:

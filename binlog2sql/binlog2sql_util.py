@@ -253,7 +253,7 @@ def reversed_lines(fin):
             # UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8c in position 0: invalid start byte
             # https://www.tutorialspoint.com/python/string_decode.htm
             try:
-                block = block.decode("utf-8")
+                block = block.decode("utf-8",'strict')
                 # block = block.decode("utf-8", "ignore")
             except Exception as e:
                 print(e.__class__, e.args)
@@ -266,7 +266,7 @@ def reversed_lines(fin):
     if part:
         yield part[::-1]
 
-
+# 也还是一次性写入文件后全部读取，不太靠谱，可能拆分组件的时候出错了。
 def reversed_blocks(fin, block_size=4096):
     """Generate blocks of file's contents in reverse order."""
     fin.seek(0, os.SEEK_END)
