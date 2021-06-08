@@ -6,6 +6,7 @@ import sys
 import argparse
 import datetime
 import getpass
+import codecs
 from contextlib import contextmanager
 from pymysqlreplication.event import QueryEvent
 from pymysqlreplication.row_event import (
@@ -43,7 +44,10 @@ def create_unique_file(filename):
 
 @contextmanager
 def temp_open(filename, mode):
-    f = open(filename, mode)
+    # UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8c in position 0: invalid start byte
+    # https://www.tutorialspoint.com/python/string_decode.htm
+    # 解决写入文件后，逆向读出报错编码错误的问题，打开就使用utf-8
+    f = codecs.open(filename, mode, "utf-8")
     try:
         yield f
     finally:
@@ -246,7 +250,14 @@ def reversed_lines(fin):
     part = ''
     for block in reversed_blocks(fin):
         if PY3PLUS:
-            block = block.decode("utf-8")
+            # UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8c in position 0: invalid start byte
+            # https://www.tutorialspoint.com/python/string_decode.htm
+            try:
+                block = block.decode("utf-8")
+                # block = block.decode("utf-8", "ignore")
+            except Exception as e:
+                print(e.__class__, e.args)
+                exit(1)
         for c in reversed(block):
             if c == '\n' and part:
                 yield part[::-1]
