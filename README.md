@@ -1,6 +1,13 @@
 binlog2sql
 ========================
 
+zhujingfa: 修复原写文件方案，读取倒序显示可能抛异常的问题：
+```
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8c in position 0: invalid start byte
+# https://www.tutorialspoint.com/python/string_decode.htm
+block = block.decode("utf-8",'strict')
+```
+
 从MySQL binlog解析出你要的SQL。根据不同选项，你可以得到原始SQL、回滚SQL、去除主键的INSERT SQL等。
 
 用途
